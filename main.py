@@ -476,6 +476,28 @@ def debug_test_hash():
     except Exception as e:
         return {"error": f"{type(e).__name__}: {str(e)}"}
 
+@app.get("/api/debug/token-check")
+def debug_token_check(token: str, db: Session = Depends(get_db)):
+    """Debug: decode a token and check if user exists."""
+    from jose import jwt as jwt_lib
+    from auth import SECRET_KEY, ALGORITHM
+    try:
+        payload = jwt_lib.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        user = db.query(User).filter(User.id == user_id).first()
+        all_users = db.query(User).all()
+        return {
+            "payload": payload,
+            "user_id_from_token": user_id,
+            "user_id_type": type(user_id).__name__,
+            "user_found": user is not None,
+            "user_email": user.email if user else None,
+            "total_users": len(all_users),
+            "all_user_ids": [u.id for u in all_users],
+        }
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)}"}
+
 
 if __name__ == "__main__":
     import uvicorn
