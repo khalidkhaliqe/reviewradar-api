@@ -81,21 +81,26 @@ class UpdateProfileRequest(BaseModel):
 
 @app.post("/api/auth/register", response_model=TokenResponse)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == req.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Dit e-mailadres is al geregistreerd")
+    try:
+        existing = db.query(User).filter(User.email == req.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Dit e-mailadres is al geregistreerd")
 
-    user = User(
-        email=req.email,
-        hashed_password=hash_password(req.password),
-        business_name=req.business_name,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+        user = User(
+            email=req.email,
+            hashed_password=hash_password(req.password),
+            business_name=req.business_name,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
-    token = create_access_token({"sub": user.id})
-    return TokenResponse(access_token=token)
+        token = create_access_token({"sub": user.id})
+        return TokenResponse(access_token=token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration error: {type(e).__name__}: {str(e)}")
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
@@ -458,7 +463,18 @@ def seed_demo_data(user: User = Depends(get_current_user), db: Session = Depends
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "ReviewRadar API", "version": "1.0.0"}
+    import sys
+    return {"status": "ok", "service": "ReviewRadar API", "version": "1.0.0", "python": sys.version}
+
+@app.get("/api/debug/test-hash")
+def debug_test_hash():
+    try:
+        from auth import hash_password, verify_password
+        h = hash_password("test123")
+        v = verify_password("test123", h)
+        return {"hash": h[:20] + "...", "verify": v}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)}"}
 
 
 if __name__ == "__main__":
